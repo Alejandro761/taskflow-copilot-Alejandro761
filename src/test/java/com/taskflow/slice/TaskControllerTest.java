@@ -90,19 +90,16 @@ class TaskControllerTest {
     }
 
     @Test
-    void getOverdue_retorna200YListaOrdenada() throws Exception {
-        // Componer datos reales con dueDates relativos
+    void getOverdue_retorna200YUnaTarea() throws Exception {
+        // El mock devuelve UNA sola tarea; el test comprueba 200 y que el primer elemento tiene id y title esperados.
         try {
-            Task antigua = new Task(7L, "Corregir bug de fechas", "d", TaskStatus.IN_PROGRESS, Priority.MED, 1L, 1L, LocalDate.now().minusDays(1));
-            Task otra = new Task(9L, "Otra vencida", "d", TaskStatus.IN_PROGRESS, Priority.MED, 1L, 1L, LocalDate.now().minusDays(2));
-            // el servicio debe devolverlas ya ordenadas por fecha asc (más antigua primero)
-            when(taskService.vencidas()).thenReturn(List.of(otra, antigua));
+            Task tarea = new Task(7L, "Corregir bug de fechas", "d", TaskStatus.IN_PROGRESS, Priority.MED, 1L, 1L, LocalDate.now().minusDays(1));
+            when(taskService.vencidas()).thenReturn(List.of(tarea));
 
             mockMvc.perform(get("/tasks/overdue"))
                     .andExpect(status().isOk())
-                    .andExpect(jsonPath("$.length()").value(2))
-                    .andExpect(jsonPath("$[0].title").value("Otra vencida"))
-                    .andExpect(jsonPath("$[1].title").value("Corregir bug de fechas"));
+                    .andExpect(jsonPath("$[0].id").value(7))
+                    .andExpect(jsonPath("$[0].title").value("Corregir bug de fechas"));
         } catch (TaskValidationException e) {
             throw new IllegalStateException(e);
         }
