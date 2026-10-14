@@ -22,6 +22,7 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
 import java.util.List;
+import java.time.LocalDate;
 import java.util.Optional;
 
 import static org.hamcrest.Matchers.matchesPattern;
@@ -86,6 +87,25 @@ class TaskControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.length()").value(2))
                 .andExpect(jsonPath("$[0].title").value("Primera"));
+    }
+
+    @Test
+    void getOverdue_retorna200YListaOrdenada() throws Exception {
+        // Componer datos reales con dueDates relativos
+        try {
+            Task antigua = new Task(7L, "Corregir bug de fechas", "d", TaskStatus.IN_PROGRESS, Priority.MED, 1L, 1L, LocalDate.now().minusDays(1));
+            Task otra = new Task(9L, "Otra vencida", "d", TaskStatus.IN_PROGRESS, Priority.MED, 1L, 1L, LocalDate.now().minusDays(2));
+            // el servicio debe devolverlas ya ordenadas por fecha asc (más antigua primero)
+            when(taskService.vencidas()).thenReturn(List.of(otra, antigua));
+
+            mockMvc.perform(get("/tasks/overdue"))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.length()").value(2))
+                    .andExpect(jsonPath("$[0].title").value("Otra vencida"))
+                    .andExpect(jsonPath("$[1].title").value("Corregir bug de fechas"));
+        } catch (TaskValidationException e) {
+            throw new IllegalStateException(e);
+        }
     }
 
     @Test

@@ -155,6 +155,49 @@ class TaskServiceTest {
         }
     }
 
+    @Nested
+    @DisplayName("vencidas")
+    class Vencidas {
+
+        @Test
+        void vencidas_filtraSoloVencidasYOrdenaPorFecha() {
+            try {
+                Task tAntigua = new Task(10L, "Antigua", "d", TaskStatus.IN_PROGRESS, Priority.MED, PROYECTO, 1L, java.time.LocalDate.now().minusDays(5));
+                Task tReciente = new Task(11L, "Reciente", "d", TaskStatus.IN_PROGRESS, Priority.MED, PROYECTO, 1L, java.time.LocalDate.now().minusDays(1));
+                Task sinFecha = new Task(12L, "Sin fecha", "d", TaskStatus.IN_PROGRESS, Priority.MED, PROYECTO, 1L, null);
+                Task donePasada = new Task(13L, "Hecha", "d", TaskStatus.DONE, Priority.MED, PROYECTO, 1L, java.time.LocalDate.now().minusDays(3));
+
+                when(repository.findAll()).thenReturn(java.util.List.of(sinFecha, donePasada, tReciente, tAntigua));
+
+                java.util.List<Task> resultado = service.vencidas();
+
+                // Debe incluir solo tAntigua y tReciente, en orden por dueDate asc (más antigua primero)
+                org.junit.jupiter.api.Assertions.assertEquals(2, resultado.size());
+                org.junit.jupiter.api.Assertions.assertEquals(10L, resultado.get(0).getId());
+                org.junit.jupiter.api.Assertions.assertEquals(11L, resultado.get(1).getId());
+            } catch (TaskValidationException e) {
+                throw new IllegalStateException(e);
+            }
+        }
+
+        @Test
+        void vencidas_noIncluyeTareasSinDueDateONoVencidasONoIncluyeDONE() {
+            try {
+                Task pendienteFutura = new Task(20L, "Futura", "d", TaskStatus.TODO, Priority.MED, PROYECTO, 1L, java.time.LocalDate.now().plusDays(1));
+                Task sinFecha = new Task(21L, "Sin fecha", "d", TaskStatus.IN_PROGRESS, Priority.MED, PROYECTO, 1L, null);
+                Task donePasada = new Task(22L, "Hecha pasada", "d", TaskStatus.DONE, Priority.MED, PROYECTO, 1L, java.time.LocalDate.now().minusDays(2));
+
+                when(repository.findAll()).thenReturn(java.util.List.of(pendienteFutura, sinFecha, donePasada));
+
+                java.util.List<Task> resultado = service.vencidas();
+
+                org.junit.jupiter.api.Assertions.assertTrue(resultado.isEmpty());
+            } catch (TaskValidationException e) {
+                throw new IllegalStateException(e);
+            }
+        }
+    }
+
     /** Fabrica una Task de rehidratación REAL (dato, no mock). assigneeId null = sin responsable. */
     private Task tarea(Long id, String title, Long assigneeId) {
         try {
