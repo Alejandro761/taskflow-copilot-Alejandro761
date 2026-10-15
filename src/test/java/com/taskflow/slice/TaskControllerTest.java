@@ -26,6 +26,7 @@ import java.time.LocalDate;
 import java.util.Optional;
 
 import static org.hamcrest.Matchers.matchesPattern;
+import static org.hamcrest.Matchers.nullValue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
@@ -192,6 +193,22 @@ class TaskControllerTest {
         mockMvc.perform(delete("/tasks/999"))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.status").value(404));
+    }
+
+    @Test
+    void getUnassigned_retorna200YAssigneeNull() throws Exception {
+        // El mock devuelve UNA sola tarea sin assignee; comprobamos id y assigneeId=null en el JSON
+        try {
+            Task tarea = new Task(4L, "Escribir tests MockMvc", "d", TaskStatus.TODO, Priority.MED, 1L, null, LocalDate.now().plusDays(7));
+            when(taskService.sinResponsable()).thenReturn(List.of(tarea));
+
+            mockMvc.perform(get("/tasks/unassigned"))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$[0].id").value(4))
+                    .andExpect(jsonPath("$[0].assigneeId").value(nullValue()));
+        } catch (TaskValidationException e) {
+            throw new IllegalStateException(e);
+        }
     }
 
     // ---- helpers de datos (reales, no mocks) ----
