@@ -1,102 +1,65 @@
-# Copilot instructions for TaskFlow API
+# Instrucciones de Copilot para TaskFlow API
 
-This file helps future Copilot sessions understand and operate in this repository.
+Este archivo lo lee Copilot en cada sesión que abras dentro de este repositorio. Describe cómo está
+hecho el proyecto y qué convenciones seguir. Si una respuesta del agente contradice este archivo, gana
+este archivo.
 
----
+## Idioma
 
-## 1) Build, test, and lint commands
+- Responde en **español**.
+- Comentarios, Javadoc y mensajes de commit en español. Los nombres de clases y métodos se quedan como
+  están en el código (mezcla de inglés y español: `TaskService.cambiarStatus()`, `Task.estaVencida()`).
 
-- Build and run locally (Maven):
-  - mvn -q -DskipTests package
-  - mvn spring-boot:run
-- Run full test suite:
-  - mvn test
-  - Run with coverage (quality gate): mvn verify  (activates JaCoCo profile `cobertura`)
-- Run a single test class or method (surefire pattern):
-  - mvn -Dtest=ClassName test
-  - mvn -Dtest=ClassName#methodName test
-- Testcontainers / Postgres integration tests (requires Docker up):
-  - mvn test -Ddocker.tests=true
-- Docker (recommended for quick runtime):
-  - docker compose up --build
-  - docker compose down
+## Comandos
 
-Note: no dedicated Java linter/formatter (Checkstyle/SpotBugs) is included by default in the repo.
+El proyecto es Maven con Spring Boot 3.5.3 y Java 21. En Windows se usan desde PowerShell.
 
----
+```powershell
+mvn -q test                                             # la suite normal (67 tests al empezar la semana)
+mvn -q test "-Dtest=TaskServiceTest"                    # una sola clase de test
+mvn spring-boot:run "-Dspring-boot.run.profiles=h2"     # la app con H2 en memoria y datos de ejemplo
+mvn -q package -DskipTests                              # solo el jar, sin tests
+```
 
-## 2) High-level architecture
+- Con el perfil `h2` la base se crea vacía y `DataSeeder` la llena en cada arranque: usuarios `ana`,
+  `luis` y `admin` (contraseñas `ana123`, `luis123`, `admin123`), 3 proyectos y 9 tareas.
+- Los tests `*IT.java` usan Testcontainers y **no** corren con `mvn test` salvo `-Ddocker.tests=true`.
+  No los actives: esta semana no se usa Docker.
 
-- Spring Boot (Java 21) REST API. Main layers:
-  - controller: HTTP entry points (DTOs in/out)
-  - service: orchestration, transactional logic
-  - repository: Spring Data JPA derived queries
-  - model: JPA entities (domain behaviour lives here)
-  - dto + mapper: separation between entities and API surface
-  - config/security: SecurityFilterChain, Jwt filter, CORS, PasswordEncoder
-  - advice/exception: centralized exception handling (maps domain exceptions -> HTTP codes)
+## Arquitectura
 
-- Persistence profiles:
-  - default: H2 (file or test-memory depending on profile)
-  - docker: PostgreSQL (configured in application-docker.yml and docker-compose.yml)
+- Paquete raíz `com.taskflow`, en capas: `controller` (HTTP) → `service` (casos de uso) → `repository`
+  (Spring Data JPA) → `model` (entidades con comportamiento). Los controladores devuelven **DTOs**
+  (`dto`), nunca entidades, a través de los mappers manuales de `mapper` (`TaskMapper.aResponse`).
+- `Task` guarda sus reglas: `Task.crear(...)` nace en `TODO` y rechaza fechas pasadas; el constructor
+  público sirve para rehidratar y sí acepta fechas pasadas; pasar a `DONE` exige responsable.
+  `Task.estaVencida()` = tiene fecha, ya pasó y no está `DONE`. **Reutiliza esas reglas, no las copies.**
+- Errores: `GlobalExceptionHandler` los convierte en respuestas uniformes. 400 validación, 404 no
+  existe, 422 estado inválido, 409 usuario duplicado, 401 sin token o login fallido, 403 sin permiso.
+  No agregues un manejador genérico de `Exception`.
+- Seguridad: JWT sin estado. Son públicos `/auth/**`, `/info`, Swagger, la consola H2 y los archivos de
+  la UI; todo lo demás pide token. Borrar un proyecto solo lo puede su dueño o un `ADMIN`
+  (`@PreAuthorize` + `ProjectSecurity`).
+- `src/main/resources/static` es una UI sencilla servida por la misma API (login, proyectos, tareas).
 
-- Build & distribution:
-  - Multi-stage Dockerfile (compile with Maven JDK stage, runtime JRE stage)
-  - docker-compose brings up `api` + `db` with sensible defaults and healthcheck
+## Convenciones
 
-- Tests:
-  - Unit, slices (@WebMvcTest/@DataJpaTest) and integration (@SpringBootTest)
-  - JaCoCo coverage gate (70%) in profile `cobertura`
-  - Testcontainers used for an optional Postgres-backed repository test when `-Ddocker.tests=true`
+- DTOs como `record` con Bean Validation y `@Valid` en los `@RequestBody`.
+- Inyección por constructor. Sin Lombok.
+- `POST` que crea → `201 Created` con cabecera `Location`; `DELETE` → `204 No Content`.
+- Rutas sin prefijo `/api`: `/tasks`, `/projects`, `/auth/login`, `/info`.
+- Tests: `unit` con JUnit 5 y Mockito sin Spring; `slice` con `@WebMvcTest` o `@DataJpaTest`;
+  `integration` con `@SpringBootTest` y perfil `test`.
 
----
+## Reglas para el agente
 
-## 3) Key conventions and repo-specific patterns
-
-- Domain rules are colocated with the entity (not in service):
-  - e.g. Task.crear(...) validates dueDate on creation; Task.setStatus(...) enforces "no DONE without assignee"; Task.estaVencida() computes overdue state.
-  - Distinguish creation vs rehydration: constructor allows rehydrating an already-expired task while the factory `crear` forbids creating one with past due date.
-
-- Controllers always use DTOs; entities are not serialized directly. Use mappers in `mapper` package.
-
-- Authorization pattern: URL-based coarse rules in SecurityConfig + data-driven checks with @PreAuthorize and beans (e.g. ProjectSecurity) for owner checks.
-
-- Data seeding: DataSeeder seeds demo users/projects/tasks only if DB is empty. Tests should not depend on seed data (integration tests create their own data).
-
-- Ordering & UI expectations: GET /tasks returns tasks ordered by TaskOrders.POR_URGENCIA (uses Task.estaVencida()). There is no dedicated "overdue" endpoint.
-
-- Profiles & environment variables:
-  - Default config: application.yml (H2 and JWT defaults for dev)
-  - Docker runtime: application-docker.yml (Postgres); docker-compose injects DB credentials and JWT_SECRET via env or .env
-
-- Testing notes for maintainers:
-  - JaCoCo profile activation uses `!m2e.version` to avoid interfering with Eclipse runs.
-  - Testcontainers requires api.version=1.41 (configured via the docker-it profile/system property when -Ddocker.tests=true).
-
----
-
-## 4) Files to check first when debugging or extending features
-
-- README.md (project overview & run instructions)
-- pom.xml (build, profiles, JaCoCo, testcontainers config)
-- Dockerfile & docker-compose.yml
-- src/main/java/com/taskflow/config/SecurityConfig.java
-- src/main/java/com/taskflow/model/Task.java (domain rules: crear, setStatus, estaVencida)
-- src/main/java/com/taskflow/service/TaskService.java and TaskOrders.java
-- src/main/java/com/taskflow/controller (TaskController, ProjectController, AuthController)
-- src/main/java/com/taskflow/config/DataSeeder.java
-
----
-
-## 5) Integration with other assistant configs
-
-- No existing assistant config files were found (CLAUDE.md, AGENTS.md, .cursorrules, .windsurfrules, CONVENTIONS.md, etc.).
-- Add any project-specific AI assistant docs here if introduced later; Copilot will prefer this file for repo hints.
-
----
-
-If you want to tune Copilot sessions around testing or add an automated MCP server (e.g., Playwright for a real frontend), say so and the repo can be extended with recommended MCP server config.
-
----
-
-Created by Copilot CLI helper to speed future automation and session setup. Ask to adjust wording, add missing commands, or include repository-specific snippets (example mvn -Dtest=...).
+- **No modifiques tests existentes** para que pasen. Si un test falla, arregla el código o explica por
+  qué el test está mal y detente.
+- No toques archivos fuera de lo que se te pidió; si crees que hace falta, dilo antes de hacerlo.
+- Al terminar un cambio en código Java corre `mvn -q test`. Si termina sin errores, di que la suite pasó;
+  no busques cuántos tests fueron (`-q` no lo imprime y buscarlo gasta créditos). Si solo cambiaste
+  documentación, no lo corras.
+- No hagas `git commit` ni `git push` salvo que te lo pidan.
+- No escribas comentarios que expliquen cosas que no verificaste. Si no sabes por qué funciona algo, no
+  lo afirmes.
+- Nunca escribas secretos (contraseñas, tokens, llaves) en archivos del repositorio.
