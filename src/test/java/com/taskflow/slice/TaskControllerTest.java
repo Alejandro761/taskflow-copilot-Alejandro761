@@ -22,9 +22,11 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
 import java.util.List;
+import java.time.LocalDate;
 import java.util.Optional;
 
 import static org.hamcrest.Matchers.matchesPattern;
+import static org.hamcrest.Matchers.nullValue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
@@ -86,6 +88,22 @@ class TaskControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.length()").value(2))
                 .andExpect(jsonPath("$[0].title").value("Primera"));
+    }
+
+    @Test
+    void getOverdue_retorna200YUnaTarea() throws Exception {
+        // El mock devuelve UNA sola tarea; el test comprueba 200 y que el primer elemento tiene id y title esperados.
+        try {
+            Task tarea = new Task(7L, "Corregir bug de fechas", "d", TaskStatus.IN_PROGRESS, Priority.MED, 1L, 1L, LocalDate.now().minusDays(1));
+            when(taskService.vencidas()).thenReturn(List.of(tarea));
+
+            mockMvc.perform(get("/tasks/overdue"))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$[0].id").value(7))
+                    .andExpect(jsonPath("$[0].title").value("Corregir bug de fechas"));
+        } catch (TaskValidationException e) {
+            throw new IllegalStateException(e);
+        }
     }
 
     @Test
@@ -175,6 +193,22 @@ class TaskControllerTest {
         mockMvc.perform(delete("/tasks/999"))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.status").value(404));
+    }
+
+    @Test
+    void getUnassigned_retorna200YAssigneeNull() throws Exception {
+        // El mock devuelve UNA sola tarea sin assignee; comprobamos id y assigneeId=null en el JSON
+        try {
+            Task tarea = new Task(4L, "Escribir tests MockMvc", "d", TaskStatus.TODO, Priority.MED, 1L, null, LocalDate.now().plusDays(7));
+            when(taskService.sinResponsable()).thenReturn(List.of(tarea));
+
+            mockMvc.perform(get("/tasks/unassigned"))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$[0].id").value(4))
+                    .andExpect(jsonPath("$[0].assigneeId").value(nullValue()));
+        } catch (TaskValidationException e) {
+            throw new IllegalStateException(e);
+        }
     }
 
     // ---- helpers de datos (reales, no mocks) ----
