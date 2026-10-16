@@ -3,6 +3,7 @@ package com.taskflow.controller;
 import com.taskflow.dto.ProjectRequest;
 import com.taskflow.dto.ProjectResponse;
 import com.taskflow.dto.TaskResponse;
+import com.taskflow.dto.ProjectSummaryResponse;
 import com.taskflow.exception.ProjectNotFoundException;
 import com.taskflow.mapper.ProjectMapper;
 import com.taskflow.mapper.TaskMapper;
@@ -85,6 +86,17 @@ public class ProjectController {
         }
         return tareas.stream().map(TaskMapper::aResponse).toList();
     }
+
+    /** GET /projects/{id}/summary — 200 con el resumen del proyecto; 404 si no existe. */
+    @Operation(summary = "Resumen de un proyecto",
+            description = "Cuenta tareas por estado y cuántas están vencidas. 404 si el proyecto no existe.")
+    @GetMapping("/projects/{id}/summary")
+    public ProjectSummaryResponse getResumen(@PathVariable("id") Long id) {
+        Project proyecto = projectService.buscarPorId(id)
+                .orElseThrow(() -> new ProjectNotFoundException(id));
+        return projectService.resumen(proyecto);
+    }
+
 
     /**
      * POST /projects — 201 + Location a /projects/{id}. @Valid dispara Bean Validation (400 si falla).

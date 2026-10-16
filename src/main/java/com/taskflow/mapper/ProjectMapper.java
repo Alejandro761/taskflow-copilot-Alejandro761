@@ -1,7 +1,9 @@
 package com.taskflow.mapper;
 
 import com.taskflow.dto.ProjectResponse;
+import com.taskflow.dto.ProjectSummaryResponse;
 import com.taskflow.model.Project;
+import java.util.Map;
 
 /**
  * ProjectMapper — puente DTO &lt;-&gt; dominio del lado Project. Estático, a mano, sin MapStruct.
@@ -21,4 +23,10 @@ public final class ProjectMapper {
         return new ProjectResponse(p.getId(), p.getName(), p.getDescription(),
                 p.getOwnerId(), p.getCreatedAt());
     }
+
+    /** Entidad -> DTO de salida del resumen de proyecto. */
+    public static ProjectSummaryResponse aSummary(Long projectId, String projectName, long totalTasks, Map<String, Long> byStatus, long overdue) {
+        return new ProjectSummaryResponse(projectId, projectName, totalTasks, byStatus, overdue);
+    }
 }
+
