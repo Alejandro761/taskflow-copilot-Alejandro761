@@ -39,7 +39,7 @@ class ProgresoProyectosServiceTest {
 
     private Task tarea(long id, String title, TaskStatus status, long projectId) {
         try {
-            return new Task(id, title, "desc", status, Priority.MED, 1L, projectId, LocalDate.now());
+            return new Task(id, title, "desc", status, Priority.MED, projectId, 1L, LocalDate.now());
         } catch (TaskValidationException e) {
             throw new IllegalStateException(e);
         }
