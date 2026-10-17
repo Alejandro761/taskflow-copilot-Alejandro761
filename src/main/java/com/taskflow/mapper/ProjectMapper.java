@@ -28,5 +28,10 @@ public final class ProjectMapper {
     public static ProjectSummaryResponse aSummary(Long projectId, String projectName, long totalTasks, Map<String, Long> byStatus, long overdue) {
         return new ProjectSummaryResponse(projectId, projectName, totalTasks, byStatus, overdue);
     }
+
+    /** Entidad -> DTO de salida del progreso por proyecto. */
+    public static com.taskflow.dto.ProjectProgressResponse aProgreso(Project proyecto, long totalTasks, long doneTasks, double percentDone) {
+        return new com.taskflow.dto.ProjectProgressResponse(proyecto.getId(), proyecto.getName(), totalTasks, doneTasks, percentDone);
+    }
 }
 

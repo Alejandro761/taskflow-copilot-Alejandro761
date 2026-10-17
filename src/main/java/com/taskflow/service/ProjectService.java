@@ -77,6 +77,30 @@ public class ProjectService {
         return com.taskflow.mapper.ProjectMapper.aSummary(proyecto.getId(), proyecto.getName(), total, byStatus, overdue);
     }
 
+    /**
+     * Progreso por proyecto: lista con total, done y porcentaje redondeado a 1 decimal.
+     * Respeta la regla: aparecen todos los proyectos y orden por projectId asc.
+     */
+    public java.util.List<com.taskflow.dto.ProjectProgressResponse> progresoPorProyecto() {
+        java.util.List<Project> proyectos = projectRepository.findAll();
+        return proyectos.stream()
+                .sorted(java.util.Comparator.comparing(Project::getId))
+                .map(p -> {
+                    java.util.List<Task> tareas = taskRepository.findByProjectId(p.getId());
+                    long total = tareas.size();
+                    long done = tareas.stream().filter(t -> t.getStatus() == com.taskflow.model.TaskStatus.DONE).count();
+                    double percent;
+                    if (total == 0) {
+                        percent = 0.0;
+                    } else {
+                        double raw = done * 100.0 / total;
+                        percent = Math.round(raw * 10.0) / 10.0;
+                    }
+                    return com.taskflow.mapper.ProjectMapper.aProgreso(p, total, done, percent);
+                })
+                .toList();
+    }
+
 
     /**
      * Crea un proyecto (POST): el request trae name y description; el ownerId NO es una constante
